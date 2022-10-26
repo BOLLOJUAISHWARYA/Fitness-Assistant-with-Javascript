@@ -2,8 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link rel="icon" href="favicon.ico">
   <link rel="stylesheet" href="static/Homepage.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils@0.1/control_utils.css" crossorigin="anonymous">
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.1/camera_utils.js" crossorigin="anonymous"></script>
@@ -13,7 +14,7 @@
 </head>
 <body>
   <!-- CONTENTS -->
-  <div class="container">
+  <div class="container" style="margin-top: 20px;">
 
       <!-- WEBCAM INPUT -->
       <div style="display:None">
@@ -24,7 +25,7 @@
       </div>
 
       <!-- MEDIAPIPE OUTPUT -->
-            <canvas class="output5" width="480px" height="600px" style="margin-top: 20px;"></canvas>
+            <canvas class="output5" width="480px" height="600px"></canvas>
 
 
     <div class="loading">
@@ -35,9 +36,15 @@
   </div>
 
   <script type="text/javascript" src="./js/pose.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"
+    integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA=="
+    crossorigin="anonymous"></script>
+  <script src="https://code.jquery.com/jquery-1.11.1.js"></script>
   <script>
       var counter=0
       var stage
+      var startDate
+      var endDate
       const video5 = document.getElementsByClassName('input_video5')[0];
       const out5 = document.getElementsByClassName('output5')[0];
       const controlsElement5 = document.getElementsByClassName('control5')[0];
@@ -72,8 +79,8 @@
         fpsControl.tick();
 
         // for displaying "Please go back"
-        var left_ankle_visibility = results.poseLandmarks[27].visibility
-        var right_ankle_visibility = results.poseLandmarks[28].visibility
+        var left_ankle_visibility = results.poseLandmarks[25].visibility
+        var right_ankle_visibility = results.poseLandmarks[26].visibility
 
         // landmarks for hip,knee,ankle
         let a=[results.poseLandmarks[23].x*out5.width,results.poseLandmarks[23].y*out5.height]
@@ -83,7 +90,7 @@
 
         canvasCtx5.save();
         canvasCtx5.clearRect(0, 0, out5.width, out5.height);
-        if((left_ankle_visibility<0.5) || (right_ankle_visibility<0.5)){
+        if((left_ankle_visibility<0.3) || (right_ankle_visibility<0.3)){
            canvasCtx5.fillStyle = "red";
           canvasCtx5.font = "bold 30px Arial";
           canvasCtx5.drawImage(results.image, 0, 0, out5.width, out5.height);
@@ -102,9 +109,36 @@
           }
 
           if (counter==0){
-            video5.srcObject.getTracks().forEach(a => a.stop());
-            location.replace("/thanks")
+            startDate =Number(new Date());
+            console.log(startDate)
           }
+
+          if (counter==2){
+            video5.srcObject.getTracks().forEach(a => a.stop());
+            endDate = Number(new Date());
+    <!--        console.log(endDate)-->
+            let seconds = (endDate- startDate)/1000;
+            console.log(seconds)  // https://stackoverflow.com/questions/2024198/how-do-i-calculate-how-many-seconds-between-two-dates
+            $(document).ready(function(){
+                 var socket = io();
+                  socket.on('connect', function(){
+                    socket.send("connected")
+                    });
+                  socket.on('disconnect', function(){
+                    socket.send("disconnected")
+                    localStream.getVideoTracks()[0].stop();
+                    });
+
+                  let data = {seconds:seconds, url:"/thanks",exercise:"squats"}
+                  socket.emit("calories_burnt",data)
+                  console.log("sending to server")
+                  socket.on('redirect', function (data) {
+                     window.location.href=data.url
+                     console.log(data.url)
+                    });
+              });
+             }
+
 
         canvasCtx5.drawImage(results.image, 0, 0, out5.width, out5.height);
         drawConnectors(
