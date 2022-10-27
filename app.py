@@ -1,7 +1,7 @@
 import base64
 from flask import *
 from flask import render_template
-from flask import request, json
+from flask import request
 import os.path
 import cv2
 import face_recognition as fr
@@ -10,32 +10,24 @@ import mediapipe as mp
 from datetime import datetime
 from flask_socketio import SocketIO, send, emit
 import numpy as np
-import zmq
 import psycopg2
 from time import sleep
-# from flask_session import Session
-import pandas as pd
-import json
-import plotly
-import plotly.express as px
+
 
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
 app = Flask(__name__)
-# app.config['SESSION_TYPE'] = 'filesystem'
 
-# app.secret_key = "usshfdhv"
-# Session(app)
 socketio = SocketIO(app)
 name = None
 login_date_time = None
-start_time = None
 
 
 # Connect to your PostgresSQL database on a remote server
 def connections():
-    conn = psycopg2.connect(host="127.0.0.1", port="5432", dbname="user_details", user="postgres", password="p@ssw0rd")
+    conn = psycopg2.connect(host="127.0.0.1", port="5432", dbname="user_details", user="postgres", password="")
+
     # Open a cursor to perform database operations
     cur = conn.cursor()
     return cur, conn
@@ -45,6 +37,7 @@ def calculate_angle(a, b, c):
     a = np.array(a)  # First
     b = np.array(b)  # Mid
     c = np.array(c)  # End
+
     radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
     angle = np.abs(radians * 180.0 / np.pi)
 
@@ -94,21 +87,6 @@ def register():
     return render_template('register.html')
 
 
-@app.route('/light_workout')
-def light_workout():
-    return render_template("light_workout.html")
-
-
-@app.route('/medium_workout')
-def medium_workout():
-    return render_template("medium_workout.html")
-
-
-@app.route('/heavy_workout')
-def heavy_workout():
-    return render_template("heavy_workout.html")
-
-
 @app.route('/add', methods=['POST'])
 def add():
     if request.method == 'POST':
@@ -140,67 +118,10 @@ def hello(data):
     return render_template("light_workout.html")
 
 
-# @socketio.on("face")
-# def face(data):
-#     global login_date_time, name
-#     print(data)
-#
-#     path = "static/users_images/"
-#
-#     known_names = []
-#     known_name_encodings = []
-#     cur, conn = connections()
-#     images = os.listdir(path)
-#     for _ in images:
-#         image = fr.load_image_file(path + _)
-#         # print(image)
-#         image_path = path + _
-#         # print(image_path)
-#         encoding = fr.face_encodings(image)[0]
-#
-#         known_name_encodings.append(encoding)
-#         known_names.append(os.path.splitext(os.path.basename(image_path))[0].lower())
-#         cap = cv2.VideoCapture(0)  # "http://192.168.29.149:8080/video"
-#         if cap.isOpened:
-#             while True:
-#                 ret, frame = cap.read()
-#                 image_data = cv2.resize(frame, (250, 250))
-#                 image_data = cv2.imencode('image_data.jpg', image_data)[1].tobytes()
-#                 base_64_encoded = base64.b64encode(image_data).decode('utf-8')
-#                 image_data = "data:image/jpeg;base64,{}".format(base_64_encoded)
-#                 send({'image_data': image_data})
-#                 face_locations = fr.face_locations(frame)
-#                 face_encodings = fr.face_encodings(frame, face_locations)
-#                 for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-#                     matches = fr.compare_faces(known_name_encodings, face_encoding)
-#                     user = ""
-#
-#                     face_distances = fr.face_distance(known_name_encodings, face_encoding)
-#                     best_match = np.argmin(face_distances)
-#
-#                     if matches[best_match]:
-#                         user = known_names[best_match]
-#
-#                     if user in known_names:
-#                         name = user
-#                         print(name)
-#                         cap.release()
-#                         dt = datetime.now()
-#                         login_date_time = dt
-#                         print(login_date_time)
-#                         cur.execute('INSERT INTO  user_logindetails(username,login) VALUES(%s,%s) ', (name, dt,))
-#                         conn.commit()
-#                         emit('redirect', {'url': url_for('success')})
-#
-#                     else:
-#                         status = "Couldn't recognise please login with password"
-#                         cap.release()
-#                         emit('redirect', {"status": status})
-
 @socketio.on("face")
-def face(img_base64):
+def face(data):
     global login_date_time, name
-    count = 0
+
     path = "static/users_images/"
 
     known_names = []
@@ -216,42 +137,41 @@ def face(img_base64):
 
         known_name_encodings.append(encoding)
         known_names.append(os.path.splitext(os.path.basename(image_path))[0].lower())
-        # cap = cv2.VideoCapture(0)
-        header, data = img_base64.split(',', 1)
+        cap = cv2.VideoCapture(0)
+        if cap.isOpened:
+            while True:
+                ret, frame = cap.read()
+                image_data = cv2.resize(frame, (250, 250))
+                image_data = cv2.imencode('image_data.jpg', image_data)[1].tobytes()
+                base_64_encoded = base64.b64encode(image_data).decode('utf-8')
+                image_data = "data:image/jpeg;base64,{}".format(base_64_encoded)
+                send({'image_data': image_data})
+                face_locations = fr.face_locations(frame)
+                face_encodings = fr.face_encodings(frame, face_locations)
+                for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                    matches = fr.compare_faces(known_name_encodings, face_encoding)
+                    user = ""
 
-        image_data = base64.b64decode(data)
-        np_array = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(np_array, cv2.IMREAD_UNCHANGED)
-        if image != "":
-            image_data = cv2.resize(image, (250, 250))
-            image_data = cv2.imencode('image_data.jpg', image_data)[1].tobytes()
-            base_64_encoded = base64.b64encode(image_data).decode('utf-8')
-            # image_data = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            face_locations = fr.face_locations(image)
-            face_encodings = fr.face_encodings(image, face_locations)
-            # print(face_encodings)
-            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                matches = fr.compare_faces(known_name_encodings, face_encoding)
-                user = ""
+                    face_distances = fr.face_distance(known_name_encodings, face_encoding)
+                    best_match = np.argmin(face_distances)
 
-                face_distances = fr.face_distance(known_name_encodings, face_encoding)
-                best_match = np.argmin(face_distances)
+                    if matches[best_match]:
+                        user = known_names[best_match]
 
-                if matches[best_match]:
-                    user = known_names[best_match]
+                    if user in known_names:
+                        name = user
+                        print(name)
+                        cap.release()
+                        dt = datetime.now()
+                        login_date_time = dt
+                        print(login_date_time)
+                        cur.execute('INSERT INTO  user_logindetails(username,login) VALUES(%s,%s) ', (name, dt,))
+                        conn.commit()
+                        emit('success', {'url': url_for('success')})
 
-                if user in known_names:
-                    name = user
-                    print(name)
-                    dt = datetime.now()
-                    login_date_time = dt
-                    print(login_date_time)
-                    cur.execute('INSERT INTO  user_logindetails(username,login) VALUES(%s,%s) ', (name, dt,))
-                    conn.commit()
-                    emit('success', {'url': url_for('success')})
-
-                else:
-                    emit('redirect', {'msg': "Couldn't recognise please login with password"})
+                    else:
+                        cap.release()
+                        emit('redirect', {'msg': "Couldn't recognise please login with password"})
 
 
 @app.route('/success')
@@ -282,434 +202,72 @@ def capture():
     return render_template('face.html')
 
 
-@app.route('/light_biceps')
-def biceps():
-    return render_template('light_biceps.html')
-
-
-@app.route('/medium_lunges')
-def lunges():
-    return render_template('medium_lunges.html')
-
-
-@app.route('/heavy_short_head_biceps.html')
-def short_head_biceps():
-    return render_template('heavy_short_head_biceps.html')
-
-
-@app.route("/light", methods=['POST'])
-def light():
-    if request.method == "POST":
-        qtc_data = request.get_json()
-        print(qtc_data)
-    msg = "Get ready for squats..!"
-    print(msg)
-    return "/light_timer"
-
-
-@socketio.on("calories_burnt")
-def calories(data):
-    global name, login_date_time
-    duration=float(data["seconds"])
-    url = str(data["url"])
-    exercise=data["exercise"]
-    cur, conn = connections()
-    sql_query = """select weight from details WHERE username=%s"""
-    cur.execute(sql_query, (name,))
-    weight = int(cur.fetchone()[0])
-    calories = 3.5 * 3 * weight * duration / 200
-    print(f"caloies burned {calories}")
-    sql_query = f"UPDATE user_logindetails SET {exercise}=%s WHERE login=%s and username=%s"
-    cur.execute(sql_query, (calories, login_date_time, name))
-    conn.commit()
-    conn.close()
-    emit('redirect', {'url': url})
-
-
-@app.route("/light_timer")
-def light_timer():
-    print("light_timer")
-    msg = "Get ready for squats..!"
-    return render_template("timer.html", msg=msg, timer=5, counter="/light_squats")
-
-
-@app.route('/light_squats')
-def light_squats():
-    return render_template('light_squats.html')
-
-
 @app.route('/food_intake', methods=['POST', 'GET'])
 def food_intake():
     return render_template("exercise.html")
 
 
-@socketio.on('light_biceps')
-def biceps(data):
-    global name, login_date_time
-    print(name)
-    print(login_date_time)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7000")
-    cap = cv2.VideoCapture("static/sample_videos/biceps.mp4")  # "http://192.168.29.149:8080/video"
-    start_time = datetime.now()  # 12:33
-    # name = session["username"]
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = im0
-            print("shape:", im0_small.shape)
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            print(login_date_time)
-            print(name)
-            if counter == 3:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 3 * weight * duration / 200
-                print(calories)
-
-                sql_query = """UPDATE user_logindetails SET biceps=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': 'light_timer'})
+@app.route('/light_workout')
+def light_workout():
+    return render_template("light_workout.html")
 
 
-@socketio.on('medium_lunges')
-def lunges(data):
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7003")
-    cap = cv2.VideoCapture("static/sample_videos/lunge_1.mp4")  # "http://192.168.29.149:8080//video"
-    start_time = datetime.now()  # 12:33
-    # name = session["username"]
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = im0
-            print("shape:", im0_small.shape)
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 3:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 5 * weight * duration / 200
-                print(calories)
-
-                sql_query = """UPDATE user_logindetails SET lunges=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': 'medium_timer'})
+@app.route('/light_biceps')
+def biceps():
+    return render_template("light_biceps.html")
 
 
-@socketio.on('heavy_short_head_biceps')
-def heavy_short_head_biceps(data):
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7004")
-    cap = cv2.VideoCapture("static/sample_videos/short head biceps.mp4")
-    start_time = datetime.now()  # 12:33
-    # name = session["username"]
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = cv2.resize(im0, (720, 360))
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 4:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 7 * weight * duration / 200
-                print(calories)
+@app.route("/light_timer")
+def light():
+    msg = "Get ready for squats..!"
+    return render_template("timer.html", timer=5, counter="/light_squats", msg=msg)
 
-                sql_query = """UPDATE user_logindetails SET short_head_biceps=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': 'heavy_timer'})
+@app.route('/light_squats')
+def squats():
+    return render_template("light_squats.html")
 
 
-@app.route("/heavy_timer")
-def heavy():
-    print("light_timer")
-    msg = "Get ready for pushups..!"
-    return render_template("timer.html", msg=msg, timer=5, counter="/heavy_pushup")
+@app.route('/medium_workout')
+def medium_workout():
+    return render_template("medium_workout.html")
 
 
-@app.route('/heavy_pushup')
-def heavy_pushup():
-    return render_template('heavy_pushup.html')
+@app.route('/medium_lunges')
+def lunges():
+    return render_template("medium_lunges.html")
 
 
 @app.route("/medium_timer")
 def medium():
-    print("medium_timer")
     msg = "Get ready for pushups..!"
     return render_template("timer.html", msg=msg, timer=5, counter="/medium_pushup")
 
 
 @app.route('/medium_pushup')
-def medium_pushup():
-    return render_template('medium_pushup.html')
+def pushup():
+    return render_template("medium_pushup.html")
+
+
+@app.route('/heavy_workout')
+def heavy_workout():
+    return render_template("heavy_workout.html")
+
+
+@app.route('/short_head_biceps')
+def short_head_biceps():
+    return render_template("short_head_biceps.html")
+
+
+@app.route("/heavy_timer")
+def heavy():
+    msg = "Get ready for pushups..!"
+    return render_template("timer.html", msg=msg, timer=5, counter="/medium_pushup")
 
 
 @app.route("/thanks")
 def thanks():
     print("thanks")
     return render_template("thanks.html")
-
-
-@socketio.on('light_squat')
-def squat(data):
-    global name, login_date_time
-    print(name)
-    print(login_date_time)
-    print(data)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7001")
-    cap = cv2.VideoCapture("static/sample_videos/squat.mp4")  # "http://192.168.29.149:8080/video"
-    start_time = datetime.now()
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = im0
-            print(im0_small.shape)
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 2:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 5 * weight * duration / 200
-                print(calories)
-
-                sql_query = """UPDATE user_logindetails SET squats=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': '/thanks'})
-
-
-@socketio.on('medium_squat')
-def medium_squat(data):
-    print(data)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7001")
-    cap = cv2.VideoCapture("static/sample_videos/squat.mp4")  # http://192.168.29.149:8080/video
-    start_time = datetime.now()
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = cv2.resize(im0.copy(), (480, 360))
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 3:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 5 * weight * duration / 200
-                print(calories)
-
-                sql_query = """UPDATE user_logindetails SET squats=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': 'medium_timer'})
-
-
-@socketio.on('medium_pushup')
-def medium_pushups(data):
-    print(data)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7002")
-    cap = cv2.VideoCapture("static/sample_videos/pushup.mp4")  # http://192.168.29.149:8080/video
-    start_time = datetime.now()
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = im0
-            # im0_small = cv2.resize(im0.copy(), (720, 360))
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 3:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 5 * weight * duration / 200
-                print(calories)
-                sql_query = """UPDATE user_logindetails SET pushup=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': '/thanks'})
-
-
-@socketio.on('heavy_pushup')
-def heavy_pushups(data):
-    print(data)
-    context = zmq.Context()
-    socket = context.socket(zmq.REQ)
-    socket.connect("tcp://127.0.0.1:7002")
-    cap = cv2.VideoCapture("static/sample_videos/pushup.mp4")  # "http://192.168.29.149:8080/video"
-    start_time = datetime.now()
-    cur, conn = connections()
-    while cap.isOpened():
-        try:
-            ret, im0 = cap.read()
-            im0_small = cv2.resize(im0.copy(), (720, 360))
-            im0_small = cv2.imencode('.jpg', im0_small)[1].tobytes()
-            base_64_encoded = base64.b64encode(im0_small).decode('utf-8')
-            str_img_base_64 = "data:image/jpeg;base64,{}".format(base_64_encoded)
-            video_feed = {"base_64": str_img_base_64}
-            # sending frames to detect.py as bytes form
-            socket.send_string(str_img_base_64)
-            # receiving frame after tracking from the detect.py
-            message = socket.recv_pyobj()
-            counter = message["counter"]
-            video = {"base_64": message["image_data"]}
-            if counter == 3:
-                end_time = datetime.now()
-                diff = end_time - start_time
-                duration = diff.total_seconds() / 60
-                sql_query = """select weight from details WHERE username=%s"""
-                cur.execute(sql_query, (name,))
-                weight = int(cur.fetchone()[0])
-                calories = 3.5 * 5 * weight * duration / 200
-                print(calories)
-                sql_query = """UPDATE user_logindetails SET pushup=%s WHERE login=%s and username=%s"""
-                cur.execute(sql_query, (calories, login_date_time, name))
-                conn.commit()
-                conn.close()
-                break
-            # emitting frame as bytes into html page
-            emit("capture_2", video)
-
-        except:
-            pass
-    cap.release()
-    emit('redirect', {'url': '/thanks'})
 
 
 @app.route('/logout')
@@ -722,51 +280,5 @@ def logout():
     return render_template("home.html")
 
 
-@app.route('/chart1')
-def chart1():
-    print("hello")
-    cur, conn = connections()
-    SQL_Query = pd.read_sql_query(
-        '''select
-           *
-          from user_logindetails''', conn)
-    df = pd.DataFrame(SQL_Query,
-                      columns=['id', 'username', 'login', 'pushup', 'biceps', 'squats', 'lunges', "short_head_biceps"])
-    print(df.info())
-    df['login'] = pd.to_datetime(df['login'], infer_datetime_format=True)
-    df.set_index(keys=['login'], inplace=True)
-    df.index = df.index.tz_convert('Asia/Kolkata')
-    df.sort_index(ascending=True, inplace=True)
-    df.reset_index(drop=False, inplace=True)
-    print(df)
-    print('The data type of df is: ', type(df))
-    fig = px.line(df, x="login", y=["biceps", "squats", "lunges", "short_head_biceps"])
-    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-    header = "Calories"
-    description = """
-    This chart shows the graph between data_time vs calories burnt during various exercises
-    """
-    return render_template('chart.html', graphJSON=graphJSON, header=header, description=description)
-
-
-@app.route('/chart2')
-def chart2():
-    df = pd.DataFrame({
-        "Vegetables": ["Lettuce", "Cauliflower", "Carrots", "Lettuce", "Cauliflower", "Carrots"],
-        "Amount": [10, 15, 8, 5, 14, 25],
-        "City": ["London", "London", "London", "Madrid", "Madrid", "Madrid"]
-    })
-
-    fig = px.bar(df, x="Vegetables", y="Amount", color="City", barmode="stack")
-
-    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-    header = "Vegetables in Europe"
-    description = """
-    The rumor that vegetarians are having a hard time in London and Madrid can probably not be
-    explained by this chart.
-    """
-    return render_template('chart.html', graphJSON=graphJSON, header=header, description=description)
-
-
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False) 
+    socketio.run(app, debug=True, use_reloader=False)  # '192.168.29.20'
