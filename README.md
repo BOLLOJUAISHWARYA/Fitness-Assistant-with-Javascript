@@ -39,7 +39,7 @@ STEP 4: You can register for face login by clicking on settings. Below are the o
 
 ![settings](https://user-images.githubusercontent.com/59137401/175224099-ad9d83ac-f79b-46a8-a009-c763568089d8.png)
 
-STEP 5: Click on Capture Face then webcam opens, when you are ready click on space bar ,image will get captured.Make sure the face is clear.
+STEP 5: Click on Capture Face then webcam opens, when you are ready capture the photo ,image will get captured.Make sure the face is clear.
 
 STEP 6: After that in the same page, whenever you want to do exercise fill the details and click next, depending on the intake it redirects to respective page like light/medium/heavy workout.
 
