@@ -19,7 +19,7 @@ mp_pose = mp.solutions.pose
 
 app = Flask(__name__)
 
-socketio = SocketIO(app)
+# socketio = SocketIO(app)
 name = None
 login_date_time = None
 
@@ -282,4 +282,5 @@ def logout():
 
 if __name__ == '__main__':
 #     socketio.run(app, debug=True, use_reloader=False)  
-      socketio.run(app)
+#       socketio.run(app)
+      app.run()
