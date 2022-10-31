@@ -281,4 +281,8 @@ def logout():
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, use_reloader=False)  # '192.168.29.20'
+#     socketio.run(app, debug=True, use_reloader=False)  
+    const PORT process.env.PORT|| '8080'
+
+# set the port
+    app.set("port", PORT);
