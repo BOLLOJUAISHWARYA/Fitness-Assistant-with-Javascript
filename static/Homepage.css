@@ -91,4 +91,17 @@ form input{
     flex-wrap: wrap;
 }
 
+@media only screen and (min-width: 1000px) {
+  #img{
+    height:480px;
+    width: 400px;
+  }
+}
 
+@media only screen and (max-width: 999px) {
+          #img{
+            height:1920px;
+            width: 1080px;
+
+}
+}
