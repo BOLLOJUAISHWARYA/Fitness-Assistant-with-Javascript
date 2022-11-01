@@ -12,7 +12,6 @@ from flask_socketio import SocketIO, send, emit
 import numpy as np
 import psycopg2
 from time import sleep
-# from flask_ngrok import run_with_ngrok
 
 
 mp_drawing = mp.solutions.drawing_utils
@@ -20,7 +19,6 @@ mp_pose = mp.solutions.pose
 
 app = Flask(__name__)
 
-# flask_ngrok.run_with_ngrok(app)
 socketio = SocketIO(app)
 name = None
 login_date_time = None
