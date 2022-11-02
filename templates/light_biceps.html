@@ -54,11 +54,11 @@
     const z = clamp(data.from.z + 0.5, 0, 1);
     return `rgba(0, ${255 * z}, ${255 * (1 - z)}, 1)`;
   }
-
+ 
   // finding angle for given 3 points
   function find_angle(A,B,C) {
-    var AB = Math.sqrt(Math.pow(B.x-A.x,2)+ Math.pow(B.y-A.y,2));
-    var BC = Math.sqrt(Math.pow(B.x-C.x,2)+ Math.pow(B.y-C.y,2));
+    var AB = Math.sqrt(Math.pow(B.x-A.x,2)+ Math.pow(B.y-A.y,2));    
+    var BC = Math.sqrt(Math.pow(B.x-C.x,2)+ Math.pow(B.y-C.y,2)); 
     var AC = Math.sqrt(Math.pow(C.x-A.x,2)+ Math.pow(C.y-A.y,2));
     var angle=Math.acos((BC*BC+AB*AB-AC*AC)/(2*BC*AB))*180/Math.PI;
     if (angle > 180.0){
@@ -74,13 +74,13 @@
     // for displaying "Please go back"
     var left_ankle_visibility = results.poseLandmarks[25].visibility
     var right_ankle_visibility = results.poseLandmarks[26].visibility
-
+    
     // landmarks for left shoulder,left elbow,left_wrist
     let a=[results.poseLandmarks[11].x*out5.width,results.poseLandmarks[11].y*out5.height]
     let b=[results.poseLandmarks[13].x*out5.width,results.poseLandmarks[13].y*out5.height]
     let c=[results.poseLandmarks[15].x*out5.width,results.poseLandmarks[15].y*out5.height]
     let A = {x:a[0], y:a[1]}, B = {x:b[0], y:b[1]}, C = {x:c[0], y:c[1]}
-
+    
     canvasCtx5.save();
     canvasCtx5.clearRect(0, 0, out5.width, out5.height);
     if((left_ankle_visibility<0.5) || (right_ankle_visibility<0.5)){
@@ -94,14 +94,14 @@
       if (angle > 160) {
         stage = "down";
       }
-
+    
       if (angle < 40 && stage === "down") {
         stage = "up";
         counter += 1;
         console.log(counter)
       }
 
-      if (counter==2){
+      if (counter==0){
         video5.srcObject.getTracks().forEach(a => a.stop());
         location.replace("/light_timer")
       }

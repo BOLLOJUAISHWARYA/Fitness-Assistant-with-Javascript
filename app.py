@@ -23,40 +23,28 @@ socketio = SocketIO(app)
 name = None
 login_date_time = None
 
-DATABASE_URL = os.environ.get('postgres://jmpzfhmuopteea:803abea6d8b0f13812302d21d388e0d62bb645ff7bd96d787d340b47a759ff46@ec2-54-82-205-3.compute-1.amazonaws.com:5432/d995muhn3hifl1')
 
-cmd_create_action_table = """CREATE TABLE details(id SERIAL primary key,name VARCHAR(25),username varchar(25),height VARCHAR(25),weight VARCHAR(25),password VARCHAR(25))"""
+# Connect to your PostgresSQL database on a remote server
+def connections():
+    conn = psycopg2.connect(host="127.0.0.1", port="5432", dbname="user_details", user="postgres", password="p@ssw0rd")
 
-con = None
-try:
-    # create a new database connection by calling the connect() function
-    con = psycopg2.connect(DATABASE_URL)
-
-    #  create a new cursor
-    cur = con.cursor()
-    cur.execute(cmd_create_action_table)
-
-    # close the communication with the HerokuPostgres
-    cur.close()
-except Exception as error:
-    print('Could not connect to the Database.')
-    print('Cause: {}'.format(error))
-
-finally:
-    # close the communication with the database server by calling the close()
-    if con is not None:
-        con.close()
-        print('Database connection closed.')
+    # Open a cursor to perform database operations
+    cur = conn.cursor()
+    return cur, conn
 
 
+def calculate_angle(a, b, c):
+    a = np.array(a)  # First
+    b = np.array(b)  # Mid
+    c = np.array(c)  # End
 
-# # Connect to your PostgresSQL database on a remote server
-# def connections():
-#     conn = psycopg2.connect(host="127.0.0.1", port="5432", dbname="user_details", user="postgres", password="p@ssw0rd")
-#
-#     # Open a cursor to perform database operations
-#     cur = conn.cursor()
-#     return cur, conn
+    radians = np.arctan2(c[1] - b[1], c[0] - b[0]) - np.arctan2(a[1] - b[1], a[0] - b[0])
+    angle = np.abs(radians * 180.0 / np.pi)
+
+    if angle > 180.0:
+        angle = 360 - angle
+
+    return angle
 
 
 @app.route('/check', methods=['POST', 'GET'])
@@ -64,9 +52,9 @@ def check():
     global login_date_time, name
     username = request.form.get('username')
     password = request.form.get('password')
-    # cur, conn = connections()
+    cur, conn = connections()
 
-    with con:
+    with conn:
         cur.execute(f"SELECT * FROM details WHERE username=%(username)s AND password=%(password)s",
                     {'username': username, 'password': password})
 
@@ -79,7 +67,7 @@ def check():
             print(login_date_time)
             print(name)
             cur.execute('INSERT INTO  user_logindetails(username,login) VALUES(%s,%s) ', (name, dt,))
-            con.commit()
+            conn.commit()
             # conn.close()
             return render_template("success.html")
 
@@ -107,7 +95,7 @@ def add():
         height = request.form.get('height')
         weight = request.form.get('weight')
         password = request.form.get('password')
-        # cur, conn = connections()
+        cur, conn = connections()
         check_in_db = "SELECT * from details where username like %s"
         cur.execute(check_in_db, [username])
         result = cur.fetchall()
@@ -118,7 +106,7 @@ def add():
         else:
             cur.execute('INSERT INTO details(name,username,height,weight,password) VALUES (%s,%s,%s,%s,%s)',
                         (name, username, height, weight, password))
-            con.commit()
+            conn.commit()
             # conn.close()
             msg = 'Registered successfully'
             return render_template('login.html', msg=msg)
@@ -138,7 +126,7 @@ def face(data):
 
     known_names = []
     known_name_encodings = []
-    # cur, conn = connections()
+    cur, conn = connections()
     images = os.listdir(path)
     for _ in images:
         image = fr.load_image_file(path + _)
@@ -178,7 +166,7 @@ def face(data):
                         login_date_time = dt
                         print(login_date_time)
                         cur.execute('INSERT INTO  user_logindetails(username,login) VALUES(%s,%s) ', (name, dt,))
-                        con.commit()
+                        conn.commit()
                         emit('success', {'url': url_for('success')})
 
                     else:
@@ -234,7 +222,6 @@ def light():
     msg = "Get ready for squats..!"
     return render_template("timer.html", timer=5, counter="/light_squats", msg=msg)
 
-
 @app.route('/light_squats')
 def squats():
     return render_template("light_squats.html")
@@ -266,11 +253,6 @@ def heavy_workout():
     return render_template("heavy_workout.html")
 
 
-@app.route('/heavy_pushup')
-def heavy_pushup():
-    return render_template('heavy_pushup.html')
-
-
 @app.route('/short_head_biceps')
 def short_head_biceps():
     return render_template("short_head_biceps.html")
@@ -291,12 +273,12 @@ def thanks():
 @app.route('/logout')
 def logout():
     dt = datetime.now()
-    # cur, conn = connections()
+    cur, conn = connections()
     # cur.execute('INSERT INTO  user_logindetails(username,logout) VALUES(%s,%s) ', (name, dt))
-    con.commit()
-    con.close()
+    conn.commit()
+    conn.close()
     return render_template("home.html")
 
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app, debug=True, use_reloader=False)  # '192.168.29.20'

@@ -20,7 +20,7 @@
         <p style="text-align:left;font-size:20px;cursor:pointer;margin:15px" onclick="openNav()">&#9776; settings</p>
  </section>
   <div id="basic" style="text-align:center;">
-	  <video class="videostream" autoplay="" controls></video>
+	  <video class="videostream" autoplay=""></video>
       <canvas id="snapshot" width=320 height=240></canvas>
       <br>
       <button class="capture-button btn btn-info">Start camera</button>
@@ -59,17 +59,16 @@
 	    });
 	  };
 
-      capturephoto.onclick = function() {
-      setInterval(displayHello, 2000);
-      }
-	  function displayHello() {
+	  capturephoto.onclick = function() {
 	    var context = snapshot.getContext('2d');
 	    // Draw the video frame to the canvas.
+
+	    console.log(context);
 	    context.drawImage(video, 0, 0, displaypic.width,displaypic.height);
 	    console.log(context.canvas.toDataURL("image/jpeg",0.5));
 	    var imgAsDataURL = context.canvas.toDataURL("image/jpeg")
-        array=
-
+	    localStream.getVideoTracks()[0].stop();
+	    video.src = '';
 	    $( document ).ready(function() {
            var socket = io();
               socket.on('connect', function(){
@@ -77,7 +76,6 @@
                 });
               socket.on('disconnect', function(){
                 socket.send("disconnected")
-                localStream.getVideoTracks()[0].stop();
                 });
               $("#send").click(function(){
               socket.emit("capture",imgAsDataURL)
