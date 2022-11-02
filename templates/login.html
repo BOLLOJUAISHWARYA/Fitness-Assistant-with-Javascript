@@ -62,7 +62,7 @@
               console.log(data.url)
               });
             socket.on('redirect', function (data) {
-              $('#log').append('<p>' + data.msg + '</p>');
+              $('#log').text( data.msg );
               });
             socket.on('message', function(data){
               $("#login_img").attr("src",data.image_data)
